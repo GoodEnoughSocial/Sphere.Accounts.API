@@ -1,32 +1,29 @@
 using Serilog;
 using Sphere.Shared;
 
-Log.Logger = SphericalLogger.SetupLogger();
+// Setting this allows us to get some benefits all over the place.
+Services.Current = Services.Accounts;
 
-Log.Information("Starting up");
-
-var registration = Services.Accounts.GetServiceRegistration();
+Log.Logger = SphericalLogger.StartupLogger(Services.Current);
 
 try
 {
-    var result = await Services.RegisterService(registration);
-
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddHealthChecks();
+    builder.Services.AddInjectableOrleansClient();
 
-    builder.Host.UseSerilog(SphericalLogger.ConfigureLogger);
+    builder.Host.UseSerilog(SphericalLogger.SetupLogger);
 
     // Add services to the container.
 
     builder.Services.AddControllers();
-    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
     var app = builder.Build();
-    app.MapHealthChecks("/health");
 
-    // Configure the HTTP request pipeline.
+    app.MapHealthChecks(Constants.HealthCheckEndpoint);
+
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
@@ -50,8 +47,6 @@ catch (Exception ex)
 }
 finally
 {
-    await Services.UnregisterService(registration);
-
     Log.Information("Shutting down");
     Log.CloseAndFlush();
 }
